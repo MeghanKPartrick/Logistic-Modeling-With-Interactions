@@ -1,0 +1,152 @@
+---
+title: "Logistic Modeling with Interactions"
+subtitle: 
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### Are Emily and Greg More Employable Than Lakisha and Jamal? ###
+
+Bertrand, M., & Mullainathan, S. (2004). Are Emily and Greg more employable than Lakisha and Jamal? A field experiment on labor market discrimination. _American Economic Review, 94_(4), pp. 991-1013.
+
+\[Abstract\]
+We perform a field experiment to measure racial discrimination in the labor market. We respond with fictitious resumes to help-wanted ads in Boston and Chicago newspapers. To manipulate perception of race, each resume is randomly assigned either a very African American sounding name or a very White sounding name. The results show significant discrimination against African-American names: White names receive 50 percent more callbacks for interviews. We also find that race affects the benefits of a better resume. For White names, a higher quality resume elicits 30 percent more callbacks whereas for African Americans, it elicits a far smaller increase. Applicants living in better neighborhoods receive more callbacks but, interestingly, this effect does not differ by race. The amount of discrimination is uniform across occupations and industries. Federal contractors and employers who list “Equal Opportunity Employer” in their ad discriminate as much as other employers. We find little evidence that our results are driven by employers inferring something other than race, such as social class, from the names. These results suggest that racial discrimination is still a prominent feature of the labor market.    
+
+
+Variables     | Descriptions
+-----------   | -----------------------------------------------------
+_call_        | Was the applicant called back? (1 = yes; 0 = no)
+_ethnicity_   | indicating ethnicity (i.e., "Caucasian-sounding" vs. "African-American sounding" first name)
+_sex_         | indicating sex
+_quality_     | Indicating quality of resume.
+_experience_  | Number of years of work experience on the resume
+_equal_       | Is the employer EOE (equal opportunity employment)?
+
+
+```{r}
+library(readr)
+library(MASS)
+
+logit = function(B0, B1, x)
+  {
+    exp(B0+B1*x)/(1+exp(B0+B1*x))
+}
+
+
+Resume <- read_csv("https://raw.githubusercontent.com/JA-McLean/STOR455/master/data/ResumeNames455.csv")
+```
+
+1) An Equal Opportunity Employer (EOE) is an employer who agrees not to discriminate against any employee or job applicant because of race, color, religion, national origin, sex, physical or mental disability, or age. Construct a logistic model to predict if the job applicant was called back using _ethnicity_, _equal_, _sex_, and the interactions between _ethnicity_ and _equal_, and _sex_ and _equal_ as the predictor variables. 
+
+```{r}
+head(Resume)
+```
+
+
+```{r}
+gmod = glm(call~ethnicity+equal+sex+(ethnicity*equal)+(sex*equal), data=Resume, family=binomial)
+
+summary(gmod)
+
+```
+
+
+2)  Conduct a drop in deviance hypothesis test to determine the effectiveness of the _equal_ terms in the model constructed in the previous question. Cite your hypotheses, p-value, and conclusion in context.
+
+```{r}
+gmod2 = glm(call~ethnicity+sex, data=Resume, family=binomial)
+
+anova(gmod2, gmod, test="Chisq")
+```
+
+The null hypothesis is that the equal terms do not have a large enough affect to be included in the model. The alternative hypothesis is that the equal terms have enough affect to be included in the model. With a p-value of 0.2629 we do not reject the null and therefore say that equal is not a term that should be included in the model.
+
+3)  Based on your model from question 1, What is the probability of a male applicant with a "Caucasian-sounding" name getting a call back from an Equal Opportunity Employer (EOE)? What is the probability of a female applicant with an "African-American sounding" name getting a call back from an Equal Opportunity Employer (EOE)?
+
+```{r}
+applicant1 = data.frame(sex='male', ethnicity='cauc', equal='no')
+applicant2 = data.frame(sex='female', ethnicity='afam', equal='no')
+
+predict(gmod, applicant1, type="response")
+predict(gmod, applicant2, type="response")
+```
+
+The probability of a male applicant with a "Caucasion-sounding" name getting a callback is 7.59%, while the probability of a female applicant with an "African-American sounding" name getting a call back is 6.98%.
+
+
+4) Does the number of years of work experience impact the relationship between _ethnicity_, _sex_, and an applicant getting called back? Construct a logistic model to predict if the job applicant was called back using _ethnicity_, _sex_, _experience_, and the interactions between _ethnicity_ and _experience_, and _sex_ and _experience_ as the predictor variables. 
+
+```{r}
+gmod3 = glm(call~ethnicity+experience+sex+(ethnicity*experience)+(sex*experience), data=Resume, family=binomial)
+
+summary(gmod3)
+```
+
+
+5)  Conduct a drop in deviance hypothesis test to determine the effectiveness of the _experience_ terms in the model constructed in the previous question. Cite your hypotheses, p-value, and conclusion in context.
+
+```{r}
+anova(gmod2, gmod3, test="Chisq")
+```
+
+The null hypothesis is that the experience terms do not have a large enough affect to be included in the model. The alternative hypothesis is that the experience terms have enough affect to be included in the model. With a p-value of 4.96e-05 we reject the null and therefore say that the experience terms should be included in the model.
+
+6)  Construct a plot with _experience_ on the horizontal axis and _call_ on the vertical axis. Add to this plot four curves, made from the model constructed in question 4. Comment on the similarities or differences between the four curves.
+    *   For an male applicant with a "Caucasian-sounding" name, add to the plot a red logistic curve showing the probability of getting a call back based on experience. 
+    *   For an female applicant with a "Caucasian-sounding" name, add to the plot a green logistic curve showing the probability of getting a call back based on experience.
+    *   For a male applicant with an "African-American sounding" name, add to the plot a blue logistic curve showing the probability of getting a call back based on experience.
+    *   For a female applicant with an "African-American sounding" name, add to the plot a orange logistic curve showing the probability of getting a call back based on experience. 
+    
+```{r}
+plot(jitter(call, amount=0.1)~experience, data=Resume)
+
+B0 = summary(gmod3)$coef[1]
+B1 = summary(gmod3)$coef[2]
+
+Resume_male_cauc = subset(Resume,sex=='male' & ethnicity=='cauc')
+Resume_female_cauc = subset(Resume,sex=='female' & ethnicity=='cauc')
+Resume_male_afam = subset(Resume,sex=='male' & ethnicity=='afam')
+Resume_female_afam = subset(Resume,sex=='female' & ethnicity=='afam')
+
+gmod_male_cauc = glm(call~experience, data=Resume_male_cauc, family=binomial)
+gmod_female_cauc = glm(call~experience, data=Resume_female_cauc, family=binomial)
+gmod_male_afam = glm(call~experience, data=Resume_male_afam, family=binomial)
+gmod_female_afam = glm(call~experience, data=Resume_female_afam, family=binomial)
+
+B0_male_cauc = summary(gmod_male_cauc)$coef[1]
+B1_male_cauc = summary(gmod_male_cauc)$coef[2]
+
+B0_female_cauc = summary(gmod_female_cauc)$coef[1]
+B1_female_cauc = summary(gmod_female_cauc)$coef[2]
+
+B0_male_afam = summary(gmod_male_afam)$coef[1]
+B1_male_afam = summary(gmod_male_afam)$coef[2]
+
+B0_female_afam = summary(gmod_female_afam)$coef[1]
+B1_female_afam = summary(gmod_female_afam)$coef[2]
+
+curve(logit(B0_male_cauc, B1_male_cauc, x),add=TRUE, col="red")
+curve(logit(B0_female_cauc, B1_female_cauc, x),add=TRUE, col="green")
+curve(logit(B0_male_afam, B1_male_afam, x),add=TRUE, col="blue")
+curve(logit(B0_female_afam, B1_female_afam, x),add=TRUE, col="orange")
+```
+    
+Both of the female graphs curve at a much higher degree as experience increases, which means that men get called back at the same rate no matter what the experience compared to women. Both of the African American sounding name graphs are much lower than both of the female and male graphs. This means at any rate of experience, African American people get called back at a much lower rate than Caucasian people.
+
+7)  Use an appropriate model selection method to construct a best model to predict if the job applicant was called back using any of the variables as predictors (except for _name_). You may also use interaction terms. Why would you not want to use _name_ as a predictor?
+
+```{r}
+head(Resume)
+
+Resume_final = Resume[,c(-1)]
+Resume_final = as.data.frame(Resume_final)
+none = glm(call~1, data=Resume_final, family="binomial")
+
+final_model_forwards = stepAIC(none, scope=list(upper=gmod3), direction="forward", trace=FALSE)
+final_model_forwards
+```
+
+You would not want to use name as a predictor because it would be equivalent to using ethnicity since the names were used to project ethnicity.
